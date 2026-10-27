@@ -37,7 +37,7 @@ function allowedKeys(input: Record<string, unknown>, keys: string[]) { if (Objec
 const keys: Record<Collection, string[]> = {
   students: ['name', 'email', 'phone', 'plan', 'monthlyFee', 'status', 'renewalDate'],
   transactions: ['description', 'category', 'type', 'amount', 'dueDate', 'status', 'studentId'],
-  classes: ['title', 'date', 'startTime', 'duration', 'capacity', 'instructor', 'studentIds'],
+  classes: ['title', 'date', 'startTime', 'duration', 'capacity', 'instructor', 'studentIds', 'syncToGoogle'],
   tasks: ['title', 'area', 'dueDate', 'done'],
   content: ['title', 'channel', 'objective', 'scheduledDate', 'status', 'body'],
   goals: ['title', 'current', 'target', 'unit', 'deadline'],
@@ -64,7 +64,7 @@ export function validateEntity(collection: Collection, raw: unknown, store: Pick
       const ids = d.studentIds as string[];
       if (new Set(ids).size !== ids.length) fail('Um aluno não pode ser inscrito duas vezes na mesma aula.');
       if (ids.length > capacity) fail('A quantidade de alunos ultrapassa as vagas da aula.');
-      return { title: text(d.title, 'Nome da aula'), date: date(d.date, 'Data'), startTime: d.startTime, duration: number(d.duration, 'Duração', 480, true, true), capacity, instructor: text(d.instructor, 'Instrutor'), studentIds: ids };
+      return { title: text(d.title, 'Nome da aula'), date: date(d.date, 'Data'), startTime: d.startTime, duration: number(d.duration, 'Duração', 480, true, true), capacity, instructor: text(d.instructor, 'Instrutor'), studentIds: ids, syncToGoogle: bool(d.syncToGoogle ?? false, 'Enviar ao Google Agenda') };
     }
     case 'tasks': return { title: text(d.title, 'Tarefa'), area: text(d.area, 'Área', 80), dueDate: date(d.dueDate, 'Prazo'), done: bool(d.done, 'Conclusão') };
     case 'content': return { title: text(d.title, 'Título'), channel: choice(d.channel, ['Instagram', 'WhatsApp'], 'Canal'), objective: text(d.objective, 'Objetivo'), scheduledDate: date(d.scheduledDate, 'Data'), status: choice(d.status, ['idea', 'draft', 'scheduled', 'published'], 'Etapa'), body: text(d.body ?? '', 'Conteúdo', 12000, true) };
@@ -73,7 +73,16 @@ export function validateEntity(collection: Collection, raw: unknown, store: Pick
 }
 export function validateSettings(raw: unknown, current: Settings): Settings {
   const input = object(raw);
-  allowedKeys(input, ['studioName', 'ownerName', 'monthlyRevenueTarget']);
+  const optionalFields = ['phone', 'email', 'address', 'instagram', 'website', 'description', 'audience', 'tone', 'services', 'studioMemory'] as const;
+  allowedKeys(input, ['studioName', 'ownerName', 'monthlyRevenueTarget', ...optionalFields]);
   const data = { ...current, ...input };
-  return { studioName: text(data.studioName, 'Nome do studio', 100), ownerName: text(data.ownerName, 'Seu nome', 100), monthlyRevenueTarget: money(data.monthlyRevenueTarget, 'Meta de receita') };
+  const result: Settings = { studioName: text(data.studioName, 'Nome do studio', 100), ownerName: text(data.ownerName, 'Seu nome', 100, true), monthlyRevenueTarget: money(data.monthlyRevenueTarget, 'Meta de receita') };
+  const limits: Record<typeof optionalFields[number], number> = { phone: 40, email: 254, address: 500, instagram: 300, website: 500, description: 3000, audience: 3000, tone: 1500, services: 3000, studioMemory: 12000 };
+  for (const field of optionalFields) result[field] = text(data[field] ?? '', field, limits[field], true);
+  if (result.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email)) fail('E-mail do studio inválido.');
+  if (result.website) {
+    try { const url = new URL(result.website); if (!['https:', 'http:'].includes(url.protocol) || !url.hostname || url.username || url.password) fail('Site: informe um endereço HTTP ou HTTPS válido.'); }
+    catch { fail('Site: informe um endereço HTTP ou HTTPS válido.'); }
+  }
+  return result;
 }

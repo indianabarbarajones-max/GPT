@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { createApp } from '../server/app.ts';
 
 const dir = await mkdtemp(join(tmpdir(), 'studio-browser-'));
-const { app, close } = createApp({ databasePath: join(dir, 'test.sqlite'), aiApiKey: '' });
+const { app, close } = createApp({ databasePath: join(dir, 'test.sqlite'), aiApiKey: '', seedDemo: true, appPin: '2468' });
 const server = app.listen(0, '127.0.0.1');
 await new Promise(resolve => server.once('listening', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -18,6 +18,9 @@ async function state() { return (await page.request.get(`${base}/api/state`)).js
 async function go(id) { await page.goto(`${base}/#${id}`); await page.locator('main h1').waitFor(); }
 async function save(label) { await page.getByRole('dialog').getByRole('button', { name: label, exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' }); }
 try {
+  await page.goto(base); await page.getByLabel('PIN de acesso').fill('2468');
+  await page.getByRole('button',{name:'Entrar no studio'}).click();
+  await page.getByRole('heading',{name:/Olá, Marina/}).waitFor();
   await go('overview');
   assert.match(await page.locator('main h1').innerText(), /Marina/);
   await go('students');
@@ -93,14 +96,27 @@ try {
   console.log('PASS rascunho WhatsApp sem envio, lembrete e plano editorial sem duplicação');
 
   await go('assistant');
-  await page.getByRole('button', { name: 'Prepare uma mensagem de cobrança gentil' }).click();
+  await page.getByRole('button', { name: 'Prepare uma mensagem para um interessado' }).click();
   await page.locator('.chat-message.assistant').waitFor();
   assert.match(await page.locator('.chat-message.assistant').innerText(), /Análise local/);
-  assert.match(await page.locator('.chat-message.assistant').innerText(), /Modelo de lembrete/);
+  assert.match(await page.locator('.chat-message.assistant').innerText(), /Modelo de acolhimento/);
   console.log('PASS assistente local com modelo de comunicação');
 
+  await go('settings');
+  await page.getByLabel('Nome do studio',{exact:true}).fill('Studio de teste compartilhado');
+  await page.getByLabel('O que o assistente precisa saber sobre o studio?').fill('Prioridade: conteúdo para iniciantes, três publicações por semana.');
+  const settingsSaved=page.waitForResponse(r=>r.url().endsWith('/api/settings')&&r.request().method()==='PATCH');
+  await page.getByRole('button',{name:'Salvar configurações',exact:true}).click();assert.equal((await settingsSaved).status(),200);
+  const second=await browser.newContext();const secondPage=await second.newPage();await secondPage.goto(base+'/#settings');
+  await secondPage.getByLabel('PIN de acesso').fill('2468');await secondPage.getByRole('button',{name:'Entrar no studio'}).click();
+  await secondPage.getByLabel('Nome do studio',{exact:true}).waitFor();
+  assert.equal(await secondPage.getByLabel('Nome do studio',{exact:true}).inputValue(),'Studio de teste compartilhado');
+  assert.match(await secondPage.getByLabel('O que o assistente precisa saber sobre o studio?').inputValue(),/iniciantes/);
+  await secondPage.getByRole('button',{name:'Sair do studio'}).click();await secondPage.getByLabel('PIN de acesso').waitFor();
+  assert.equal((await secondPage.request.get(base+'/api/state')).status(),401);await second.close();
+  console.log('PASS PIN, configurações e memória compartilhadas entre dois navegadores independentes; logout protege API');
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const id of ['overview', 'students', 'schedule', 'finance', 'routine', 'content', 'growth', 'assistant']) {
+  for (const id of ['overview', 'students', 'schedule', 'finance', 'routine', 'content', 'growth', 'assistant', 'settings']) {
     await go(id);
     const dimensions = await page.evaluate(() => ({ content: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     assert.ok(dimensions.content <= dimensions.viewport, `${id}: overflow ${dimensions.content}/${dimensions.viewport}`);
@@ -110,7 +126,7 @@ try {
   await page.getByRole('heading', { name: 'Seus alunos', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Fechar menu', exact: true }).count(), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS oito telas em celular, menu acessível e nenhum erro JavaScript');
+  console.log('PASS nove telas em celular, menu acessível e nenhum erro JavaScript');
 } catch (error) {
   await page.screenshot({ path: '/tmp/studio-browser-failure.png', fullPage: true }).catch(() => {});
   throw error;

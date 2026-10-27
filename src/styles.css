@@ -11,3 +11,4 @@
 .table-wrap{position:relative}.communication-composer .communication-form{padding-left:0;padding-right:0;padding-bottom:0}
 .chart-month{min-width:0}
 @media(max-width:760px){.bar-chart{gap:8px}.chart-bars{gap:4px}.bar{width:16px}.content-nudge{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start}.content-nudge>.button{grid-column:2;margin-left:0;justify-self:start}.content-nudge>div{min-width:0}}
+.sidebar{overflow-y:auto;overscroll-behavior:contain}.sidebar>*{flex-shrink:0}

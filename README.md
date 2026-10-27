@@ -1,73 +1,98 @@
 # Studio Flow
 
-Primeira versão de um app de gestão para studios de yoga, em português. O foco inicial é padronizar a comunicação e a divulgação de quem trabalha com WhatsApp e planilhas.
+App de gestão para studios de yoga, em português, com foco na rotina da equipe, no relacionamento e no marketing de conteúdo. A instalação no servidor começa vazia, pronta para cadastrar os dados reais do studio.
 
-## O que funciona
+## Fluxo de trabalho
 
-- **Comunicação:** modelos editáveis para interessados, aulas experimentais, acompanhamento, renovação e indicação. Cópia de texto ou abertura de um rascunho no WhatsApp; o envio é feito pela pessoa responsável. Lembretes de acompanhamento entram na rotina.
-- **Conteúdo:** planejamento por canal e etapa, edição de legendas e sequência semanal reutilizável. O status “programado” é uma organização interna; não publica nas redes.
-- **Alunos:** cadastro, busca, planos e situação. O plano não gera cobranças automaticamente.
-- **Agenda:** aulas, horários, instrutores e inscrições respeitando as vagas. Inscrição é reserva, não presença confirmada.
-- **Financeiro:** receitas, despesas, vencimentos, confirmação manual e exportação CSV. Os totais mensais agrupam lançamentos pelo vencimento, não pela data de pagamento; não são um extrato bancário.
-- **Rotina e crescimento:** tarefas diárias reutilizáveis e metas com progresso manual.
-- **Assistente:** resumos e modelos locais por regras. Integração opcional com IA generativa preparada no servidor.
+- **Visão geral:** tarefas do dia, próximos conteúdos e compromissos; o financeiro continua acessível no menu.
+- **Minha rotina:** tarefas, prazos e listas diárias reutilizáveis.
+- **Comunicação:** seis modelos de WhatsApp, lembretes de acompanhamento e planejamento semanal de conteúdo. O usuário revisa e envia a mensagem no WhatsApp; o app não dispara mensagens nem publica nas redes.
+- **Agenda:** compromissos, aulas e reservas com limite de vagas. Cada compromisso pode ser marcado para sincronizar com o Google Agenda após a conexão da conta.
+- **Alunos:** cadastro, planos, renovação e situação. O plano não cria cobranças automaticamente.
+- **Financeiro:** lançamentos manuais, confirmação de recebimento/pagamento e exportação CSV. Totais mensais usam o vencimento dos registros quitados; não representam o extrato bancário.
+- **Crescimento:** metas com progresso manual.
+- **Configurações:** informações reais do studio, contatos, público, tom de voz, serviços, memória compartilhada para a IA e estado das integrações.
+- **Assistente:** análise local identificada quando não há chave de API; conexão opcional com a API da OpenAI.
 
-A primeira execução cria dados fictícios do **Studio Aurora**. O banner de demonstração permanece visível. O nome, o responsável e a meta mensal podem ser personalizados. Os registros são persistidos em SQLite; atualizar a página ou reiniciar o servidor não apaga as alterações.
+O servidor usa entrada por PIN compartilhado, sessões e limite de tentativas. A mesma base é usada por todos os dispositivos que acessam a instalação publicada. Não há usuários individuais nem permissões diferentes.
 
-## Experimentar sem instalar programas
+## Publicar online
 
-A demonstração `Studio-Flow-Abrir.html` contém tudo em um arquivo. No computador, abra-o no Chrome, Edge ou Safari. Ela usa dados fictícios e salva alterações somente neste navegador; não acessa o banco do servidor nem IA generativa. Se o navegador bloquear o armazenamento, o app mostra que as alterações são temporárias. Mover/renomear o arquivo, trocar de navegador ou apagar os dados do navegador pode perder o acesso aos registros locais. Visualizadores de anexos em celulares podem não executar o app.
+[Preparar publicação no Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Findianabarbarajones-max%2FGPT&branch=codex%2Fstudio-flow)
 
-Para gerar novamente: `npm run build:portable`. O arquivo sai em `.data/Studio-Flow-Abrir.html`. Para testar o arquivo sem rede: `npm run test:portable`.
+A configuração `render.yaml` prepara um servidor Node.js 24 com disco persistente. Esse plano é pago: confirme o preço na sua conta Render antes de criar o serviço. O link inicia a configuração; não é uma URL de um app já publicado.
 
-## Executar
+Siga o [guia de publicação](docs/DEPLOY.md) para conectar o GitHub, informar o PIN no campo seguro, obter a URL pública e configurar Google Agenda e IA. Hospedagem estática como GitHub Pages não executa o servidor, não protege os dados com o PIN e não fornece o banco compartilhado.
 
-Requer Node.js 24 ou superior.
+## Executar no desenvolvimento
+
+Requer Node.js 24 ou superior. No ambiente da nuvem, o checkout fica em `/workspace/GPT`; em outra máquina, execute os comandos dentro da pasta do projeto.
 
 ```bash
-cd /workspace/GPT
 npm ci
 npm run build
 npm test
 npm start
 ```
 
-O servidor atende apenas a interface local, na porta **3001**, e entrega a aplicação compilada. Para desenvolvimento com atualização automática:
+No desenvolvimento local, o PIN padrão é `0000`; a variável `APP_PIN` o substitui. Na hospedagem, defina o PIN combinado no campo seguro — produção não tem PIN padrão.
+
+Para editar com recarga automática:
 
 ```bash
 npm run dev
 ```
 
-O Vite usa a porta **5173** e encaminha `/api` para **3001**. As verificações locais incluem `GET /api/health`, `GET /api/state` e `POST /api/assistant` com um JSON contendo `message`.
+O Vite usa a porta **5173** e encaminha `/api` para o servidor na **3001**. Em produção, o servidor usa a porta fornecida pela hospedagem e recebe requisições pela interface pública. O build de frontend é servido pelo próprio Express.
 
-## Assistente com IA
+As variáveis estão documentadas em `.env.example`. Arquivos `.env` não são carregados automaticamente. Use as variáveis do processo ou os campos seguros da hospedagem. **APP_PIN** é obrigatório na produção; **APP_ORIGIN** define o endereço público. No Render, o servidor pode usar **RENDER_EXTERNAL_URL** como origem.
 
-Sem credencial, o assistente identifica suas respostas como **análise local**. Ele consegue calcular os indicadores atuais e oferecer modelos fixos; não interpreta livremente qualquer pedido como um modelo de linguagem.
+## IA e memória
 
-Para usar a integração, configure `AI_API_KEY` como segredo do ambiente de execução, destinado a `api.openai.com`, e reinicie o servidor. `AI_MODEL` é opcional; o padrão é `gpt-4.1-mini`. A chave nunca deve entrar em código, no navegador ou em conversa. `.env.example` documenta os nomes; arquivos `.env` não são carregados automaticamente.
+O ChatGPT Plus e a memória da sua conta ChatGPT não são credenciais utilizáveis pelo app. A API da OpenAI tem chave, faturamento e limites separados. Configure **AI_API_KEY** no servidor; **AI_MODEL** é opcional. Não coloque chaves no HTML, no GitHub ou em conversas.
 
-O servidor usa a API Responses da OpenAI, com `store: false`, contexto de indicadores agregados e tempo limite. Nomes completos, e-mails e telefones conhecidos dos alunos são removidos do pedido antes do envio. Essa remoção não garante anonimização de informações livres: evite colocar dados pessoais nas mensagens. O pedido e os indicadores são enviados quando você consulta o assistente. Ele não altera cadastros, publica conteúdo nem dispara cobranças.
+O contexto compartilhado é preenchido em **Configurações → Memória do studio**, junto com público, tom de voz e serviços. Ele é persistido na base do studio e usado para orientar as consultas à IA. Não há importação automática da memória ou do histórico do ChatGPT.
 
-A indicação “IA configurada” significa apenas que há uma credencial. A conexão real não foi validada nesta entrega por falta de chave. A integração foi testada com resposta simulada, incluindo falha do provedor.
+O servidor usa a API Responses com `store: false`, indicadores do studio e instruções para sugestões práticas. O pedido e o contexto necessário são enviados à OpenAI quando você consulta o assistente. Evite informações pessoais desnecessárias nos campos de contexto e nas mensagens. O assistente oferece sugestões para revisão; não executa cobranças, não publica conteúdo e não envia mensagens aos alunos.
 
-## Dados e limites desta versão
+A indicação “IA configurada” significa que existe uma credencial. Uma consulta bem-sucedida é necessária para validar o funcionamento real. Sem chave, o app identifica as respostas como análise local e oferece modelos prontos.
 
-- Banco padrão: `.data/studio.sqlite` (fora do Git). `DATABASE_PATH` permite escolher outro arquivo. Preserve o banco ao atualizar; faça cópias de segurança com o servidor parado.
-- Datas operacionais usam o fuso `America/Sao_Paulo`; valores monetários estão em reais.
-- É um protótipo local com dados de demonstração. Antes de uso real pela equipe ou publicação, faltam autenticação, permissões, estratégia de backup e recuperação e configuração de hospedagem com HTTPS.
-- Não há importação automática das planilhas, integração bancária, cobranças, WhatsApp Business API ou publicação nas redes. A conversa no WhatsApp é aberta pelo usuário, com rascunho para revisão.
-- A conversa com o assistente não tem histórico persistente nem contexto entre pedidos. Os registros operacionais têm persistência.
+## Google Agenda
 
-## Desenvolvimento e validação
+A integração exige credencial OAuth de aplicativo Web do Google e autorização da conta que receberá os compromissos. Configure **GOOGLE_CLIENT_ID** e **GOOGLE_CLIENT_SECRET** no servidor, registre o URI de retorno correto no Google e use **Conectar** em Configurações.
 
-React + TypeScript + Vite no frontend; Express + SQLite nativo do Node no backend. Fontes são servidas pelo próprio app. Ícones: Lucide.
+A conexão é compartilhada. Somente compromissos marcados para o Google são sincronizados com a agenda principal da conta conectada. O status mostra erros e permite tentar novamente. Reservas de alunos não se tornam convites por e-mail. Consulte as etapas completas no [guia de publicação](docs/DEPLOY.md#conectar-o-google-agenda).
+
+## Dados e limites
+
+- O SQLite padrão fica em `.data/studio.sqlite`, fora do Git. **DATABASE_PATH** permite usar um disco persistente, como `/var/data/studio.sqlite` no Render.
+- Novos bancos começam vazios. Bancos existentes são preservados ao atualizar. Limpeza de dados deve ser uma operação explícita, com cópia de segurança.
+- Os tokens Google são criptografados; a chave fica junto ao banco no disco persistente. Preserve banco e chave nas cópias privadas.
+- Datas operacionais usam `America/Sao_Paulo`; valores monetários estão em reais.
+- Não há importação automática das planilhas, integração bancária, cobrança automática, WhatsApp Business API ou publicação automática nas redes.
+- A tela do assistente não representa o histórico da conta ChatGPT. A memória do studio é mantida nas configurações do próprio sistema.
+
+## Demonstração em um arquivo
+
+A versão HTML baixável é independente do servidor. Seus dados ficam somente no navegador; não são sincronizados com outros dispositivos. Ela não deve ser confundida com o app online protegido por sessão no servidor.
 
 ```bash
-npm run build   # TypeScript e build de produção
-npm test        # API, validação, persistência, vínculos e assistente
-npm run test:browser # Fluxos reais em Chromium; aceita CHROMIUM_PATH
+npm run build:portable
+npm run test:portable
 ```
 
-Os testes da API e do navegador usam bancos temporários, sem alterar a demonstração. O teste de navegador usa Chromium em `/usr/bin/chromium`; defina `CHROMIUM_PATH` se o executável estiver em outro local. Fluxos de navegador foram conferidos com Chromium em desktop e celular.
+O gerador produz `.data/Studio-Flow-Abrir.html`. Chrome e Edge no computador podem abri-lo; visualizadores de anexos em celulares podem não executar o aplicativo. O comportamento do armazenamento varia entre navegadores, e mover o arquivo ou limpar os dados pode remover o acesso aos registros locais.
 
-Cada tarefa da nuvem já possui um ambiente isolado. Use o checkout existente; não crie Git worktrees sem uma solicitação explícita.
+## Verificações de desenvolvimento
+
+```bash
+npm run build        # TypeScript e build de produção
+npm test             # API, dados, autenticação e integrações
+npm run test:browser # Fluxos reais no navegador
+```
+
+Os testes usam bancos temporários. Os testes de navegador usam Chromium em `/usr/bin/chromium`; **CHROMIUM_PATH** permite selecionar outro executável. Integrações verificadas com respostas simuladas não comprovam uma conexão real com Google ou OpenAI; valide cada uma na conta correspondente após configurar as credenciais.
+
+React + TypeScript + Vite no frontend, Express + SQLite nativo do Node no backend. Fontes e ícones são servidos pelo próprio app.
+
+Cada tarefa da nuvem já possui um ambiente isolado. Use o checkout existente; não crie Git worktrees sem solicitação explícita.

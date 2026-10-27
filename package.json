@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "concurrently -k -n api,web \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "node --use-env-proxy --watch --import tsx server/index.ts",
     "dev:web": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "start": "tsx server/index.ts",
+    "start": "node --use-env-proxy --import tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "npm run build && node --import tsx tests/browser.mjs",
     "build:portable": "tsc --noEmit && node scripts/build-portable.mjs",

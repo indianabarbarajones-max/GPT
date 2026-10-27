@@ -17,20 +17,22 @@ const student = {
 };
 
 async function running(databasePath: string, aiApiKey = '') {
-  const { app, close } = createApp({ databasePath, aiApiKey });
+  const { app, close } = createApp({ databasePath, aiApiKey, seedDemo: true, appPin: '2468' });
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve, reject) => {
     server.once('listening', resolve);
     server.once('error', reject);
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const login = await fetch(`${base}/api/auth/login`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:'2468'})});
+  const cookie = login.headers.get('set-cookie')!.split(';')[0];
   let closed = false;
   return {
     base,
     async request(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}) {
       return fetch(`${base}${path}`, {
         method,
-        headers: { ...(data === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
+        headers: { Cookie: cookie, ...(data === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
         body: data === undefined ? undefined : JSON.stringify(data),
       });
     },
@@ -178,12 +180,12 @@ test('operational records and settings support validated updates', async t => {
   assert.equal((await api.request('/api/settings', 'PATCH', settings)).status, 200);
   assert.equal((await api.request('/api/settings', 'PATCH', { monthlyRevenueTarget: -1 })).status, 400);
   const state: StudioState = await (await api.request('/api/state')).json();
-  assert.deepEqual(state.settings, settings);
+  for (const [key,value] of Object.entries(settings)) assert.equal(state.settings[key as keyof typeof settings],value);
   await api.stop();
   const reopened = await running(api.databasePath);
   try {
     const restored: StudioState = await (await reopened.request('/api/state')).json();
-    assert.deepEqual(restored.settings, settings);
+    for (const [key,value] of Object.entries(settings)) assert.equal(restored.settings[key as keyof typeof settings],value);
   } finally { await reopened.stop(); }
 });
 
@@ -259,6 +261,8 @@ test('assistant aggregates exactly seven calendar days and manual goal progress'
 
 test('AI integration sends aggregate context, redacts known student details, and exposes provider failures', async t => {
   const state: StudioState = { ...seedState(), aiConfigured: true };
+  state.settings.studioMemory = 'Priorizar calendário editorial de três publicações.';
+  state.settings.audience = 'Pessoas iniciantes em yoga';
   let sent = '';
   let destination = '';
   const mock = t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
@@ -276,6 +280,8 @@ test('AI integration sends aggregate context, redacts known student details, and
   const payload = JSON.parse(sent);
   assert.equal(payload.store, false);
   assert.match(payload.input, /financialPeriodBasis/);
+  assert.match(payload.input, /Priorizar calendário editorial/);
+  assert.match(payload.input, /Pessoas iniciantes em yoga/);
   mock.mock.mockImplementation(async () => new Response('', { status: 401 }));
   await assert.rejects(assistant('Resumo financeiro', state, 'test-server-key', 'test-model'), /AI_HTTP_401/);
 });

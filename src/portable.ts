@@ -1,14 +1,14 @@
 // Used only by the downloadable demonstration. The server application never loads this adapter.
-import { seedState } from '../server/seed';
+
 import { localAssistant } from '../server/assistant';
 import { object, validateEntity, validateSettings, ValidationError } from '../server/validation';
 import type { Collection, Entity, StudioState } from '../shared/types';
 
 const collections: Collection[] = ['students', 'transactions', 'classes', 'tasks', 'content', 'goals'];
-const storageKey = 'studio-flow-portable-v1';
+const storageKey = 'studio-flow-portable-v2';
 let persistent = false;
 let loadError = '';
-let current: StudioState = { ...seedState(), aiConfigured: false };
+let current: StudioState = {students:[],transactions:[],classes:[],tasks:[],content:[],goals:[],settings:{studioName:'Meu Studio',ownerName:'',monthlyRevenueTarget:0},demo:true,aiConfigured:false};
 try {
   const stored = localStorage.getItem(storageKey);
   if (stored) {
@@ -35,6 +35,7 @@ const originalFetch = window.fetch.bind(window);
 window.fetch = async (input, options) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   if (!url.startsWith('/api/')) return originalFetch(input, options);
+  if (url === '/api/auth/status') return json({authenticated:true});
   if (loadError) return json({ error: loadError }, 500);
   try {
     const method = options?.method?.toUpperCase() ?? 'GET';
@@ -42,6 +43,8 @@ window.fetch = async (input, options) => {
     const collection = segments[0] as Collection;
     const id = segments[1];
     const body = options?.body ? JSON.parse(String(options.body)) : {};
+    if (url === '/api/auth/status') return json({authenticated:true});
+    if (url === '/api/integrations') return json({ai:{configured:false,model:''},google:{configured:false,connected:false,calendarId:'primary',missing:[]}});
     if (url === '/api/state' && method === 'GET') return json({ ...current, storage: persistent ? 'browser' : 'memory' });
     if (url === '/api/health' && method === 'GET') return json({ status: 'ok' });
     if (url === '/api/assistant' && method === 'POST') {
@@ -63,6 +66,7 @@ window.fetch = async (input, options) => {
     if (method === 'POST' || method === 'PATCH') {
       if (method === 'PATCH' && !id) return json({ error: 'Registro não encontrado.' }, 404);
       const data = validateEntity(collection, body, { get }, existing);
+      if(collection === 'classes' && data.syncToGoogle) throw new ValidationError('A conexão Google está disponível na versão online.');
       const record = { ...data, id: id || globalThis.crypto?.randomUUID?.() || `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}` } as unknown as Entity;
       const next = structuredClone(current);
       const records = next[collection] as Entity[];
