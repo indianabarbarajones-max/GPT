@@ -39,6 +39,6 @@ Peça ajuda para organizar o dia, planejar conteúdos ou preparar uma mensagem. 
 
 ## Publicação e versões
 
-O código no GitHub e a versão HTML baixável não são uma publicação online do servidor. O HTML guarda dados apenas naquele navegador, sem sessão PIN de servidor nem sincronização. Para a equipe usar o app em vários dispositivos, ative uma hospedagem com banco persistente seguindo [docs/DEPLOY.md](docs/DEPLOY.md).
+O código no GitHub e a versão HTML baixável não são uma publicação online do servidor. O HTML guarda dados apenas naquele navegador, sem sessão PIN de servidor nem sincronização. Para a equipe usar o app em vários dispositivos, use a [publicação gratuita na Cloudflare](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Findianabarbarajones-max%2FGPT%2Ftree%2Fstudio-flow-free), dentro das cotas do plano Workers Free. O [guia de publicação](docs/DEPLOY.md) explica os passos, incluindo o PIN e o banco persistente.
 
 A publicação, a autorização Google e a configuração de uma chave de API válida exigem as contas e confirmações dos respectivos titulares. O guia indica os passos; nenhum plano de hospedagem foi contratado automaticamente.

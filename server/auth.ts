@@ -1,6 +1,15 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { Request, Response } from 'express';
 import type { Store } from './store.ts';
+
+export interface AuthRequest { headers: { cookie?: string }; ip?: string; body?: { pin?: unknown } }
+interface CookieOptions { httpOnly?: boolean; secure?: boolean; sameSite?: 'lax'; path?: string; maxAge?: number }
+export interface AuthResponse {
+  setHeader(name: string, value: string | number): unknown;
+  status(code: number): AuthResponse;
+  json(body: unknown): unknown;
+  cookie(name: string, value: string, options: CookieOptions): unknown;
+  clearCookie(name: string, options: CookieOptions): unknown;
+}
 
 type Sessions = Record<string, number>;
 type Limits = Record<string, { count: number; until: number }>;
@@ -10,7 +19,7 @@ export class PinAuth {
   private salt: string;
   private hash: Buffer;
   readonly cookieName: string;
-  constructor(private store: Store, pin: string, private secure = false, private now = () => Date.now()) {
+  constructor(private store: Pick<Store, 'getMeta' | 'setMeta'>, pin: string, private secure = false, private now = () => Date.now()) {
     if (!/^\d{4,12}$/.test(pin)) throw new Error('APP_PIN deve conter entre 4 e 12 dígitos.');
     this.cookieName = secure ? '__Host-studio_session' : 'studio_session';
     this.salt = store.getMeta<string>('auth:salt') || randomBytes(24).toString('hex');
@@ -25,7 +34,7 @@ export class PinAuth {
     if (Object.keys(all).length !== Object.keys(live).length) this.store.setMeta('auth:sessions', live);
     return live;
   }
-  session(req: Request): string | undefined {
+  session(req: AuthRequest): string | undefined {
     const token = (req.headers.cookie || '').split(';').map(p => p.trim()).find(p => p.startsWith(this.cookieName + '='))?.slice(this.cookieName.length + 1);
     if (!token || !/^[a-f0-9]{64}$/.test(token)) return undefined;
     const key = digest(token);
@@ -43,7 +52,7 @@ export class PinAuth {
     this.store.setMeta('limits:' + scope, live);
     return 0;
   }
-  login(req: Request, res: Response) {
+  login(req: AuthRequest, res: AuthResponse) {
     const globalWait = this.limit('login-global', 'shared', 100, 60 * 60 * 1000);
     const wait = globalWait || this.limit('login-ip', req.ip || 'unknown', 6, 15 * 60 * 1000);
     if (wait) { res.setHeader('Retry-After', wait); return res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.' }); }
@@ -59,7 +68,7 @@ export class PinAuth {
     res.cookie(this.cookieName, token, { httpOnly: true, secure: this.secure, sameSite: 'lax', path: '/', maxAge: 7 * DAY });
     return res.json({ authenticated: true });
   }
-  logout(req: Request, res: Response) {
+  logout(req: AuthRequest, res: AuthResponse) {
     const key = this.session(req); const all = this.sessions();
     if (key) { delete all[key]; this.store.setMeta('auth:sessions', all); }
     res.clearCookie(this.cookieName, { httpOnly: true, secure: this.secure, sameSite: 'lax', path: '/' });

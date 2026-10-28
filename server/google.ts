@@ -46,7 +46,8 @@ export class GoogleIntegration {
     this.clientSecret = (options.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET ?? '').trim();
     this.keyFile = resolve(dirname(options.databasePath ?? process.env.DATABASE_PATH ?? '.data/studio.sqlite'), '.google-encryption-key');
     this.suppliedKey = options.encryptionKey ?? process.env.INTEGRATION_ENCRYPTION_KEY ?? '';
-    this.fetcher = options.fetch ?? fetch;
+    // Workers' fetch requires the global receiver when stored on an instance.
+    this.fetcher = options.fetch ?? fetch.bind(globalThis);
     this.now = options.now ?? Date.now;
   }
 

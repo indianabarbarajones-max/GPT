@@ -18,11 +18,21 @@ O servidor usa entrada por PIN compartilhado, sessões e limite de tentativas. A
 
 ## Publicar online
 
-[Preparar publicação no Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Findianabarbarajones-max%2FGPT&branch=codex%2Fstudio-flow)
+[**Publicar gratuitamente na Cloudflare**](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Findianabarbarajones-max%2FGPT%2Ftree%2Fstudio-flow-free)
 
-A configuração `render.yaml` prepara um servidor Node.js 24 com disco persistente. Esse plano é pago: confirme o preço na sua conta Render antes de criar o serviço. O link inicia a configuração; não é uma URL de um app já publicado.
+A configuração `wrangler.jsonc` usa **Workers Free**, arquivos estáticos e banco SQLite persistente em um Durable Object. Todos os dispositivos usam a mesma base e o PIN é validado no servidor. A hospedagem é gratuita dentro das cotas do plano; a API da OpenAI tem cobrança independente e é opcional.
 
-Siga o [guia de publicação](docs/DEPLOY.md) para conectar o GitHub, informar o PIN no campo seguro, obter a URL pública e configurar Google Agenda e IA. Hospedagem estática como GitHub Pages não executa o servidor, não protege os dados com o PIN e não fornece o banco compartilhado.
+O botão abre a configuração na sua conta Cloudflare: conecte o GitHub, informe **APP_PIN** como segredo e confirme a publicação. Não é um endereço de app já publicado. Siga o [guia de publicação](docs/DEPLOY.md) para os passos e integrações. A alternativa Render continua disponível, mas exige plano pago com disco.
+
+GitHub Pages sozinho não fornece a API nem o banco compartilhado deste app. Na opção gratuita, a Cloudflare executa essas partes no servidor; os dados não ficam limitados ao navegador.
+
+Para validar a versão Cloudflare no desenvolvimento, com Node 24 e dependências instaladas:
+
+```bash
+npm run test:cloudflare
+```
+
+Esse comando compila o app, empacota o Worker sem publicá-lo e testa PIN, persistência após reinício, dados compartilhados e navegação no runtime local da Cloudflare. Para desenvolvimento interativo, crie um `.dev.vars` privado a partir de `.dev.vars.example`, preencha um PIN de teste, execute `npm run build` e `npm run dev:cloudflare`. Nunca versione `.dev.vars` ou publique um PIN de teste.
 
 ## Executar no desenvolvimento
 
@@ -65,9 +75,10 @@ A conexão é compartilhada. Somente compromissos marcados para o Google são si
 
 ## Dados e limites
 
-- O SQLite padrão fica em `.data/studio.sqlite`, fora do Git. **DATABASE_PATH** permite usar um disco persistente, como `/var/data/studio.sqlite` no Render.
+- Na Cloudflare, o SQLite fica no armazenamento persistente do Durable Object **STUDIO**. Não remova esse recurso nem altere o identificador fixo `studio` para atualizar o app. Dados do Node/HTML não são migrados automaticamente para a Cloudflare.
+- No servidor Node, o SQLite padrão fica em `.data/studio.sqlite`, fora do Git. **DATABASE_PATH** permite usar um disco persistente, como `/var/data/studio.sqlite` no Render.
 - Novos bancos começam vazios. Bancos existentes são preservados ao atualizar. Limpeza de dados deve ser uma operação explícita, com cópia de segurança.
-- Os tokens Google são criptografados; a chave fica junto ao banco no disco persistente. Preserve banco e chave nas cópias privadas.
+- Os tokens Google são criptografados. Na Cloudflare, a chave gerada fica no armazenamento privado persistente; no Node, fica junto ao banco no disco. **INTEGRATION_ENCRYPTION_KEY** permite fornecer uma chave separada no servidor. Preserve a chave e o banco nas cópias privadas.
 - Datas operacionais usam `America/Sao_Paulo`; valores monetários estão em reais.
 - Não há importação automática das planilhas, integração bancária, cobrança automática, WhatsApp Business API ou publicação automática nas redes.
 - A tela do assistente não representa o histórico da conta ChatGPT. A memória do studio é mantida nas configurações do próprio sistema.
@@ -89,10 +100,11 @@ O gerador produz `.data/Studio-Flow-Abrir.html`. Chrome e Edge no computador pod
 npm run build        # TypeScript e build de produção
 npm test             # API, dados, autenticação e integrações
 npm run test:browser # Fluxos reais no navegador
+npm run test:cloudflare # Runtime Cloudflare, persistência, autenticação e navegador
 ```
 
 Os testes usam bancos temporários. Os testes de navegador usam Chromium em `/usr/bin/chromium`; **CHROMIUM_PATH** permite selecionar outro executável. Integrações verificadas com respostas simuladas não comprovam uma conexão real com Google ou OpenAI; valide cada uma na conta correspondente após configurar as credenciais.
 
-React + TypeScript + Vite no frontend, Express + SQLite nativo do Node no backend. Fontes e ícones são servidos pelo próprio app.
+React + TypeScript + Vite no frontend; backend Cloudflare Workers + SQLite persistente, ou Express + SQLite nativo do Node. As regras de dados, PIN e integrações são compartilhadas. Fontes e ícones são servidos pelo próprio app.
 
 Cada tarefa da nuvem já possui um ambiente isolado. Use o checkout existente; não crie Git worktrees sem solicitação explícita.
